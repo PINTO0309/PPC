@@ -68,8 +68,8 @@ Use `--detector-model` to specify the detector ONNX model.
 
 ```bash
 uv run python 01_data_prep_realdata.py \
-  --input-image-dir /path/to/labeled-images \
-  --detector-model /path/to/detector.onnx
+--input-image-dir /path/to/labeled-images \
+--detector-model /path/to/detector.onnx
 ```
 
 ## Inference
