@@ -10,6 +10,8 @@ A model that performs binary classification to determine whether the subject is 
 The PyTorch model and exported ONNX model always return two probabilities in the following order:
 `[no_possession_probability, possession_probability]`.
 
+https://github.com/user-attachments/assets/715f87c7-e1ed-4849-b838-377bb010a99f
+
 ## Setup
 
 The Python version and dependencies are pinned in `pyproject.toml`.
