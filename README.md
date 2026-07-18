@@ -24,7 +24,10 @@ https://github.com/user-attachments/assets/715f87c7-e1ed-4849-b838-377bb010a99f
 The Python version and dependencies are pinned in `pyproject.toml`.
 
 ```bash
+git clone https://github.com/PINTO0309/PPC.git && cd PPC
+curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
+source .venv/bin/activate
 ```
 
 Run the commands below in the managed environment by prefixing them with `uv run`.
