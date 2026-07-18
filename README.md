@@ -1,4 +1,6 @@
 # PPC
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21422276.svg)](https://doi.org/10.5281/zenodo.21422276) ![GitHub License](https://img.shields.io/github/license/pinto0309/ppc)
+ [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/PINTO0309/ppc)
 
 A model that performs binary classification to determine whether the subject is holding a smartphone. 48x48 RGB image.
 
@@ -240,3 +242,20 @@ interact with smartphones](https://github.com/PINTO0309/PUC) - MIT License
 11. [HHC: Head Hat Classification. HHC is a binary classifier for cropped head images. 48x48.](https://github.com/PINTO0309/HHC) - MIT License
 12. [BPC: Background Plain classification. 48x48.](https://github.com/PINTO0309/BPC) - MIT License
 13. [PPC: Binary classification to determine whether the subject is holding a smartphone. 48x48 RGB image.](https://github.com/PINTO0309/PPC) - MIT License
+
+## Citation
+
+If you find this project useful, please consider citing:
+
+```bibtex
+@software{hyodo2025ppc,
+  author    = {Katsuya Hyodo},
+  title     = {PINTO0309/PC},
+  month     = {07},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.21422276},
+  url       = {https://github.com/PINTO0309/ppc},
+  abstract  = {Binary classification to determine whether the subject is holding a smartphone. 48x48 RGB image.},
+}
+```
