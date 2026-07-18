@@ -12,6 +12,13 @@ The PyTorch model and exported ONNX model always return two probabilities in the
 
 https://github.com/user-attachments/assets/715f87c7-e1ed-4849-b838-377bb010a99f
 
+## Data sample
+
+|no<br>possession|no<br>possession|possession|possession|possession|possession|
+|:-:|:-:|:-:|:-:|:-:|:-:|
+<img width="48" height="48" alt="no_action_008364" src="https://github.com/user-attachments/assets/327c71a0-c636-4ea9-8700-ed5a28a0050e" />|<img width="48" height="48" alt="no_action_008001" src="https://github.com/user-attachments/assets/9d080aa1-fc47-4c83-85a6-9e1f1fa087b8" />|<img width="48" height="48" alt="point_somewhere_002145" src="https://github.com/user-attachments/assets/2d816974-3ddd-4d2c-ae61-0df6cbe5c14f" />|<img width="48" height="48" alt="point_somewhere_002068" src="https://github.com/user-attachments/assets/108d9652-0c07-47f0-8b34-428ee5f23dfa" />|<img width="48" height="48" alt="point_003496" src="https://github.com/user-attachments/assets/0bc4d7bd-e85e-43f9-a893-dbbb070f46da" />|<img width="48" height="48" alt="point_003008" src="https://github.com/user-attachments/assets/cbf23eed-5ded-4709-8e7a-0cc8eab920eb" />|
+
+
 ## Setup
 
 The Python version and dependencies are pinned in `pyproject.toml`.
