@@ -1,6 +1,6 @@
 # PPC
 
-A binary classification pipeline that determines whether a subject is holding an object from a 48x48 RGB image.
+A model that performs binary classification to determine whether the subject is holding a smartphone. 48x48 RGB image.
 
 | class_id | label | Model output index |
 | ---: | --- | ---: |
