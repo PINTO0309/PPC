@@ -228,5 +228,3 @@ ablation_heatmaps/
 *.JPG
 split_list.csv
 puc
-demo_phone_gaze_classification.py
-demo_puc.py

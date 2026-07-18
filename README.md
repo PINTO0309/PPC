@@ -112,5 +112,57 @@ uv run python 11_ablate_ppc_features.py \
 ```
 
 Legacy three-class PUC Parquet files, checkpoints, and ONNX models are not compatible with PPC.
-`demo_puc.py` and `demo_phone_gaze_classification.py` are independent legacy demos and are outside
-the scope of this PPC pipeline.
+
+## PUC demos with the PPC possession gate
+
+`demo_ppc.py` retains the existing three-class PUC action inference and adds PPC inference on the
+same center-expanded RGB hand crop. Both classifiers use `INTER_LINEAR` resizing, 0-to-1
+normalization, and CHW conversion. The PPC output order must be `[no_possession, possession]`.
+
+```bash
+uv run python demo_ppc.py \
+  --model /path/to/wholebody_detector.onnx \
+  --puc_model /path/to/puc_model.onnx \
+  --ppc_model /path/to/ppc_best.onnx \
+  --video /path/to/input.mp4
+```
+
+The gaze-enabled demo uses the same PPC gate while preserving Gazelle processing:
+
+```bash
+uv run python demo_phone_gaze_classification.py \
+  --model /path/to/wholebody_detector.onnx \
+  --puc_model /path/to/puc_model.onnx \
+  --enable-puc \
+  --ppc_model /path/to/ppc_best.onnx \
+  --gazelle-model /path/to/gazelle.onnx \
+  --video /path/to/input.mp4
+```
+
+Gaze-to-hand overlap is evaluated in a region obtained by expanding the original detected Hand box
+by 1.5x around its center. This is independent of the 2.5x crop used as the PUC/PPC model input.
+
+`--ppc_model` and `--ppc-model` are equivalent. Both demos use `ppc_l_48x48.onnx` by default when
+the option is omitted. PPC is still inferred for each detected hand, then both hands belonging to a
+body are combined into one PPC label and confidence. A hand is labeled `possession` when its
+`possession` probability is 0.5 or greater. `possession` takes priority over
+`no_possession`, and the highest-confidence result within that class becomes the body result.
+
+The combined PPC result is tracked per body and smoothed with the same `state_verdict` algorithm
+previously used by PUC. The default long and short histories are 10 and 6 frames. A new body remains
+`no_possession` until all history buffers are populated; with continuous `possession`, the default
+gate opens on frame 10. It then requires at least 5 positive samples in the 10-frame history and at
+least 5 in the latest 6 frames. Configure the buffers with `--ppc-long-history-size` and
+`--ppc-short-history-size`; the existing `--hand-*` and `--body-*` names remain aliases.
+
+PUC action inference, UI tracking, and gaze activation proceed only while the history-confirmed PPC
+label is `possession`. PUC itself has no temporal history, so its current-frame result is reflected
+immediately after the PPC gate. PPC errors and frames without a valid PPC result append a negative
+history sample and still force immediate `no_action` for that frame.
+
+The body overlay shows the history-confirmed PPC label but always displays the representative hand's
+current-frame `possession` probability. It may therefore show a value below 0.5 while a historical
+`possession` state is being maintained. In the gaze demo, a suppressed body is excluded from
+gaze-based activation. The PUC action gate is disabled by default; pass `--enable-puc` to restrict
+gaze candidates to Hands classified by PUC as `point_somewhere` or `point`. PUC inference and the
+existing display values remain available when the gate is disabled.
