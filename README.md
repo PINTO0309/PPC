@@ -76,7 +76,7 @@ uv run python 01_data_prep_realdata.py \
 ```bash
 uv run python demo_phone_gaze_classification.py \
 -v 0 \
--pm puc_l_48x48.onnx \
+-pm ppc_l_48x48.onnx \
 -dlr -dnm -dgm -dhm \
 -ep cuda \
 -gm gazelle_dinov3_vit_tiny_inout_1x3x640x640_1xNx4.onnx \
@@ -84,115 +84,132 @@ uv run python demo_phone_gaze_classification.py \
 
 uv run python demo_phone_gaze_classification.py \
 -v 0 \
--pm puc_l_48x48.onnx \
+-pm ppc_l_48x48.onnx \
 -dlr -dnm -dgm -dhm \
 -ep tensorrt \
 -gm gazelle_dinov3_vit_tiny_inout_1x3x640x640_1xNx4.onnx \
 --enable-heatmap
 ```
 
-## Training and inference
+## Training Pipeline
+
+- Use the labeled image folders under `data/no_action`, `data/point_somewhere`, and `data/point`.
+- `02_make_parquet.py` writes pre-defined train/val splits into `data/dataset.parquet` using an image-level 9:1 split per class.
+- The training loop relies on `BCEWithLogitsLoss` plus class-balanced `pos_weight` to stabilise optimisation under class imbalance; inference produces sigmoid probabilities. Use `--train_resampling weighted` to switch on the previous `WeightedRandomSampler` behaviour, or `--train_resampling balanced` to physically duplicate minority classes before shuffling.
+- Training history, validation metrics, optional test predictions, checkpoints, configuration JSON, and ONNX exports are produced automatically.
+- Per-epoch checkpoints named like `ppc_epoch_0001.pt` are retained (latest 10), as well as the best checkpoints named `ppc_best_epoch0004_f1_0.9321.pt` (also latest 10).
+- The backbone can be switched with `--arch_variant`. Supported combinations with `--head_variant` are:
+
+  | `--arch_variant` | Default (`--head_variant auto`) | Explicitly selectable heads | Remarks |
+  |------------------|-----------------------------|---------------------------|------|
+  | `baseline`       | `avg`                       | `avg`, `avgmax_mlp`       | When using `transformer`/`mlp_mixer`, you need to adjust the height and width of the feature map so that they are divisible by `--token_mixer_grid` (if left as is, an exception will occur during ONNX conversion or inference). |
+  | `inverted_se`    | `avgmax_mlp`                | `avg`, `avgmax_mlp`       | When using `transformer`/`mlp_mixer`, it is necessary to adjust `--token_mixer_grid` as above. |
+  | `convnext`       | `transformer`               | `avg`, `avgmax_mlp`, `transformer`, `mlp_mixer` | For token mixer heads, the feature map dimensions must be divisible by `--token_mixer_grid` (default `2x3`). |
+- The classification head is selected with `--head_variant` (`avg`, `avgmax_mlp`, `transformer`, `mlp_mixer`, or `auto` which derives a sensible default from the backbone).
+- Pass `--rgb_to_yuv_to_y` to convert RGB crops to YUV, keep only the Y (luma) channel inside the network, and train a single-channel stem without modifying the dataloader.
+- Alternatively, use `--rgb_to_lab` or `--rgb_to_luv` to convert inputs to CIE Lab/Luv (3-channel) before the stem; these options are mutually exclusive with each other and with `--rgb_to_yuv_to_y`.
+- Mixed precision can be enabled with `--use_amp` when CUDA is available.
+- Resume training with `--resume path/to/ppc_epoch_XXXX.pt`; all optimiser/scheduler/AMP states and history are restored.
+- Loss/accuracy/F1 metrics are logged to TensorBoard under `output_dir`, and `tqdm` progress bars expose per-epoch progress for train/val/test loops.
+
+Baseline depthwise-separable CNN:
 
 ```bash
+SIZE=48x48
 uv run python -m ppc train \
-  --data_root data/dataset.parquet \
-  --output_dir runs/ppc_baseline \
-  --epochs 30
+--data_root data/dataset.parquet \
+--output_dir runs/ppc_${SIZE} \
+--epochs 100 \
+--batch_size 256 \
+--train_resampling balanced \
+--image_size ${SIZE} \
+--base_channels 32 \
+--num_blocks 4 \
+--arch_variant baseline \
+--seed 42 \
+--device auto \
+--use_amp
 ```
 
-The best model is selected using validation `possession_f1` and saved as
-`ppc_best_*_possession_f1_*.pt`. Training history includes accuracy, possession precision/recall/F1,
-and macro precision/recall/F1. When training finishes, `runs/ppc_baseline/ppc_best.onnx` is
-automatically exported from the best checkpoint and simplified with onnxsim. The generated ONNX path
-is recorded as `onnx_model` in `summary.json`, while the simplification result is recorded as
-`onnx_simplified`.
+Inverted residual + SE variant (recommended for higher capacity):
 
 ```bash
-uv run python -m ppc predict \
-  --checkpoint runs/ppc_baseline/ppc_best_epoch0001_possession_f1_0.9000.pt \
-  --inputs data/possession/000000 \
-  --output runs/ppc_baseline/predictions.csv
+SIZE=48x48
+VAR=s
+uv run python -m ppc train \
+--data_root data/dataset.parquet \
+--output_dir runs/ppc_is_${VAR}_${SIZE} \
+--epochs 100 \
+--batch_size 256 \
+--train_resampling balanced \
+--image_size ${SIZE} \
+--base_channels 32 \
+--num_blocks 4 \
+--arch_variant inverted_se \
+--head_variant avgmax_mlp \
+--seed 42 \
+--device auto \
+--use_amp
+
 ```
 
-The prediction CSV contains `pred_label`, `pred_class`, `prob_no_possession`, and `prob_possession`.
+ConvNeXt-style backbone with transformer head over pooled tokens:
 
-## ONNX
+```bash
+SIZE=48x48
+uv run python -m ppc train \
+--data_root data/dataset.parquet \
+--output_dir runs/ppc_convnext_${SIZE} \
+--epochs 100 \
+--batch_size 256 \
+--train_resampling balanced \
+--image_size ${SIZE} \
+--base_channels 32 \
+--num_blocks 4 \
+--arch_variant convnext \
+--head_variant transformer \
+--token_mixer_grid 2x2 \
+--seed 42 \
+--device auto \
+--use_amp
+```
+
+- Outputs include the latest 10 `ppc_epoch_*.pt`, the latest 10 `ppc_best_epochXXXX_f1_YYYY.pt` (highest validation F1, or training F1 when no validation split), `history.json`, `summary.json`, optional `test_predictions.csv`, and `train.log`.
+- After every epoch a confusion matrix and ROC curve are saved under `runs/ppc/diagnostics/<split>/confusion_<split>_epochXXXX.png` and `roc_<split>_epochXXXX.png`.
+- `--image_size` accepts either a single integer for square crops (e.g. `--image_size 48`) or `HEIGHTxWIDTH` to resize non-square frames (e.g. `--image_size 64x48`).
+- Add `--resume <checkpoint>` to continue from an earlier epoch. Remember that `--epochs` indicates the desired total epoch count (e.g. resuming `--epochs 40` after training to epoch 30 will run 10 additional epochs).
+- Launch TensorBoard with:
+  ```bash
+  tensorboard --logdir runs/ppc
+  ```
+
+### ONNX Export
 
 ```bash
 uv run python -m ppc exportonnx \
-  --checkpoint runs/ppc_baseline/ppc_best_epoch0001_possession_f1_0.9000.pt \
-  --output ppc_s_48x48.onnx
+--checkpoint runs/ppc_is_s_48x48/ppc_best_epoch0049_f1_0.9939.pt \
+--output ppc_s_48x48.onnx \
+--opset 17
 ```
 
-Visualize feature maps:
+- The saved graph exposes `images` as input and `prob_pointing` as output (batch dimension is dynamic); probabilities can be consumed directly.
+- After exporting, the tool runs `onnxsim` for simplification and rewrites any remaining BatchNormalization nodes into affine `Mul`/`Add` primitives. If simplification fails, a warning is emitted and the unsimplified model is preserved.
 
-```bash
-uv run python 10_visualize_ppc_heatmaps.py \
-  --model ppc_s_48x48.onnx \
-  --image data/possession/000000/point_000000.png
-```
+## Arch
 
-Run feature ablation against the `possession` probability:
+<img width="350" alt="puc_p_48x48" src="https://github.com/user-attachments/assets/4f4bacfd-5ac1-4af6-a68b-379377f3dc49" />
 
-```bash
-uv run python 11_ablate_ppc_features.py \
-  --model ppc_s_48x48.onnx \
-  --image-dir data/possession/000000 \
-  --target-class possession
-```
-
-Legacy three-class PUC Parquet files, checkpoints, and ONNX models are not compatible with PPC.
-
-## PUC demos with the PPC possession gate
-
-`demo_ppc.py` retains the existing three-class PUC action inference and adds PPC inference on the
-same center-expanded RGB hand crop. Both classifiers use `INTER_LINEAR` resizing, 0-to-1
-normalization, and CHW conversion. The PPC output order must be `[no_possession, possession]`.
-
-```bash
-uv run python demo_ppc.py \
-  --model /path/to/wholebody_detector.onnx \
-  --puc_model /path/to/puc_model.onnx \
-  --ppc_model /path/to/ppc_best.onnx \
-  --video /path/to/input.mp4
-```
-
-The gaze-enabled demo uses the same PPC gate while preserving Gazelle processing:
-
-```bash
-uv run python demo_phone_gaze_classification.py \
-  --model /path/to/wholebody_detector.onnx \
-  --puc_model /path/to/puc_model.onnx \
-  --enable-puc \
-  --ppc_model /path/to/ppc_best.onnx \
-  --gazelle-model /path/to/gazelle.onnx \
-  --video /path/to/input.mp4
-```
-
-Gaze-to-hand overlap is evaluated in a region obtained by expanding the original detected Hand box
-by 1.5x around its center. This is independent of the 2.5x crop used as the PUC/PPC model input.
-
-`--ppc_model` and `--ppc-model` are equivalent. Both demos use `ppc_l_48x48.onnx` by default when
-the option is omitted. PPC is still inferred for each detected hand, then both hands belonging to a
-body are combined into one PPC label and confidence. A hand is labeled `possession` when its
-`possession` probability is 0.5 or greater. `possession` takes priority over
-`no_possession`, and the highest-confidence result within that class becomes the body result.
-
-The combined PPC result is tracked per body and smoothed with the same `state_verdict` algorithm
-previously used by PUC. The default long and short histories are 10 and 6 frames. A new body remains
-`no_possession` until all history buffers are populated; with continuous `possession`, the default
-gate opens on frame 10. It then requires at least 5 positive samples in the 10-frame history and at
-least 5 in the latest 6 frames. Configure the buffers with `--ppc-long-history-size` and
-`--ppc-short-history-size`; the existing `--hand-*` and `--body-*` names remain aliases.
-
-PUC action inference, UI tracking, and gaze activation proceed only while the history-confirmed PPC
-label is `possession`. PUC itself has no temporal history, so its current-frame result is reflected
-immediately after the PPC gate. PPC errors and frames without a valid PPC result append a negative
-history sample and still force immediate `no_action` for that frame.
-
-The body overlay shows the history-confirmed PPC label but always displays the representative hand's
-current-frame `possession` probability. It may therefore show a value below 0.5 while a historical
-`possession` state is being maintained. In the gaze demo, a suppressed body is excluded from
-gaze-based activation. The PUC action gate is disabled by default; pass `--enable-puc` to restrict
-gaze candidates to Hands classified by PUC as `point_somewhere` or `point`. PUC inference and the
-existing display values remain available when the gate is disabled.
+## Ultra-lightweight classification model series
+1. [VSDLM: Visual-only speech detection driven by lip movements](https://github.com/PINTO0309/VSDLM) - MIT License
+2. [OCEC: Open closed eyes classification. Ultra-fast wink and blink estimation model](https://github.com/PINTO0309/OCEC) - MIT License
+3. [PGC: Ultrafast pointing gesture classification](https://github.com/PINTO0309/PGC) - MIT License
+4. [SC: Ultrafast sitting classification](https://github.com/PINTO0309/SC) - MIT License
+5. [PUC: Phone Usage Classifier is a three-class image classification pipeline for understanding how people
+interact with smartphones](https://github.com/PINTO0309/PUC) - MIT License
+6. [HSC: Happy smile classifier](https://github.com/PINTO0309/HSC) - MIT License
+7. [WHC: Waving Hand Classification](https://github.com/PINTO0309/WHC) - MIT License
+8. [UHD: Ultra-lightweight human detection](https://github.com/PINTO0309/UHD) - MIT License
+9. [MWC: Mask wearing classifier](https://github.com/PINTO0309/MWC) - MIT License
+10. [SGC: Classification of wearing vs. not wearing sunglasses. 48x48.](https://github.com/PINTO0309/SGC) - MIT License
+11. [HHC: Head Hat Classification. HHC is a binary classifier for cropped head images. 48x48.](https://github.com/PINTO0309/HHC) - MIT License
+12. [BPC: Background Plain classification. 48x48.](https://github.com/PINTO0309/BPC) - MIT License
