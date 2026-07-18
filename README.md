@@ -12,6 +12,16 @@ The PyTorch model and exported ONNX model always return two probabilities in the
 
 https://github.com/user-attachments/assets/715f87c7-e1ed-4849-b838-377bb010a99f
 
+  |Variant|Size|F1|CPU<br>inference<br>latency|ONNX|
+  |:-:|:-:|:-:|:-:|:-:|
+  |P|115 KB|0.8959| 0.24 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_p_48x48.onnx)|
+  |N|176 KB|0.9386| 0.39 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_n_48x48.onnx)|
+  |T|280 KB|0.9520| 0.51 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_t_48x48.onnx)|
+  |S|495 KB|0.9664| 0.66 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_s_48x48.onnx)|
+  |C|876 KB|0.9868| 0.73 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_c_48x48.onnx)|
+  |M|1.7 MB|0.9924| 0.86 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_m_48x48.onnx)|
+  |L|6.4 MB|0.9961| 1.07 ms|[Download](https://github.com/PINTO0309/PPC/releases/download/onnx/ppc_l_48x48.onnx)|
+
 ## Data sample
 
 |no<br>possession|no<br>possession|possession|possession|possession|possession|
