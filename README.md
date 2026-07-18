@@ -72,6 +72,22 @@ uv run python 01_data_prep_realdata.py \
 --detector-model /path/to/detector.onnx
 ```
 
+<img width="758" height="482" alt="class_distribution" src="https://github.com/user-attachments/assets/79f9f5e8-e7f7-4167-ab10-aba72d2dc7da" />
+
+```
+Split counts:
+  train: 39376
+    val: 4375
+Label counts:
+     no_possession: 25981
+        possession: 17770
+Split/label counts:
+  train    no_possession: 23383
+  train       possession: 15993
+    val    no_possession: 2598
+    val       possession: 1777
+```
+
 ## Inference
 ```bash
 uv run python demo_phone_gaze_classification.py \
