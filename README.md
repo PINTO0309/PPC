@@ -250,7 +250,7 @@ If you find this project useful, please consider citing:
 ```bibtex
 @software{hyodo2025ppc,
   author    = {Katsuya Hyodo},
-  title     = {PINTO0309/PC},
+  title     = {PINTO0309/PPC},
   month     = {07},
   year      = {2026},
   publisher = {Zenodo},
